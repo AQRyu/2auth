@@ -1,11 +1,14 @@
 // Global variables
 let authToken = null;
 let currentUser = null;
+let pendingLoginData = null; // Store username/password for TOTP verification
 
 // DOM elements
 const loginForm = document.getElementById('loginForm');
+const totpForm = document.getElementById('totpForm');
 const adminDashboard = document.getElementById('adminDashboard');
 const authFormEl = document.getElementById('authForm');
+const totpAuthFormEl = document.getElementById('totpAuthForm');
 const userModal = document.getElementById('userModal');
 const userForm = document.getElementById('userForm');
 
@@ -18,7 +21,6 @@ async function login(event) {
 
     const username = document.getElementById('loginUsername').value;
     const password = document.getElementById('loginPassword').value;
-    const totpCode = document.getElementById('loginTotp').value;
 
     try {
         const response = await fetch(`${API_BASE}/auth/login`, {
@@ -29,7 +31,7 @@ async function login(event) {
             body: JSON.stringify({
                 usernameOrEmail: username,
                 password: password,
-                totpCode: totpCode || null
+                totpCode: null // First attempt without TOTP
             })
         });
 
@@ -40,6 +42,26 @@ async function login(event) {
         }
 
         const result = await response.json();
+
+        // Check if TOTP is required
+        if (result.requireTotp) {
+            // Store login data for TOTP verification
+            pendingLoginData = {
+                username: username,
+                password: password
+            };
+
+            // Hide login form and show TOTP form
+            loginForm.style.display = 'none';
+            totpForm.style.display = 'block';
+            hideError('loginError');
+
+            // Focus on TOTP input
+            document.getElementById('totpCode').focus();
+            return;
+        }
+
+        // Normal login successful
         authToken = result.accessToken;
         currentUser = result.user;
 
@@ -56,13 +78,96 @@ async function login(event) {
     }
 }
 
+async function verifyTotp(event) {
+    event.preventDefault();
+
+    if (!pendingLoginData) {
+        showError('totpError', 'Session expired. Please login again.');
+        backToLogin();
+        return;
+    }
+
+    const totpCode = document.getElementById('totpCode').value;
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                usernameOrEmail: pendingLoginData.username,
+                password: pendingLoginData.password,
+                totpCode: totpCode
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            showError('totpError', error.message || 'Invalid TOTP code');
+            // Clear the TOTP input for retry
+            document.getElementById('totpCode').value = '';
+            document.getElementById('totpCode').focus();
+            return;
+        }
+
+        const result = await response.json();
+
+        // Clear pending login data
+        pendingLoginData = null;
+
+        // Store auth data
+        authToken = result.accessToken;
+        currentUser = result.user;
+
+        // Show dashboard
+        totpForm.style.display = 'none';
+        adminDashboard.style.display = 'block';
+        document.getElementById('currentUser').textContent = currentUser.username;
+
+        // Clear forms
+        document.getElementById('authForm').reset();
+        document.getElementById('totpAuthForm').reset();
+        hideError('totpError');
+
+        // Load dashboard data
+        loadDashboard();
+
+    } catch (error) {
+        showError('totpError', 'Network error: ' + error.message);
+    }
+}
+
+function backToLogin() {
+    pendingLoginData = null;
+    totpForm.style.display = 'none';
+    loginForm.style.display = 'block';
+    document.getElementById('totpAuthForm').reset();
+    hideError('totpError');
+    // Focus back on username field
+    document.getElementById('loginUsername').focus();
+}
+
 function logout() {
     authToken = null;
     currentUser = null;
+    pendingLoginData = null;
+
+    // Hide all forms except login
     loginForm.style.display = 'block';
+    totpForm.style.display = 'none';
     adminDashboard.style.display = 'none';
+
+    // Reset all forms
     document.getElementById('authForm').reset();
+    document.getElementById('totpAuthForm').reset();
+
+    // Hide all errors
     hideError('loginError');
+    hideError('totpError');
+
+    // Focus on username field
+    document.getElementById('loginUsername').focus();
 }
 
 // Dashboard functions
@@ -73,7 +178,6 @@ async function loadDashboard() {
 
 async function loadUsers() {
     const loading = document.getElementById('usersLoading');
-    const error = document.getElementById('usersError');
     const tableBody = document.getElementById('usersTableBody');
 
     loading.style.display = 'block';
@@ -125,7 +229,7 @@ async function loadStats() {
         const totalUsers = users.length;
         const activeUsers = users.filter(u => !u.accountLocked && u.accountEnabled).length;
         const lockedUsers = users.filter(u => u.accountLocked).length;
-        const adminUsers = users.filter(u => u.roles && u.roles.includes('ADMIN')).length;
+        const adminUsers = users.filter(u => u.roles?.includes('ADMIN')).length;
 
         document.getElementById('totalUsers').textContent = totalUsers;
         document.getElementById('activeUsers').textContent = activeUsers;
@@ -154,9 +258,7 @@ function createUserRow(user) {
     }
 
     const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never';
-    const roles = user.roles ? user.roles.join(', ') : 'USER';
-
-    row.innerHTML = `
+    const roles = user.roles?.join(', ') || 'USER'; row.innerHTML = `
         <td>${user.username}</td>
         <td>${user.email}</td>
         <td>${user.firstName || ''} ${user.lastName || ''}</td>
@@ -353,10 +455,23 @@ function hideSuccess(elementId) {
 // Event listeners
 document.addEventListener('DOMContentLoaded', function () {
     authFormEl.addEventListener('submit', login);
+    totpAuthFormEl.addEventListener('submit', verifyTotp);
+    document.getElementById('backToLogin').addEventListener('click', backToLogin);
     document.getElementById('logoutBtn').addEventListener('click', logout);
     document.getElementById('addUserBtn').addEventListener('click', showAddUserModal);
     document.getElementById('saveUserBtn').addEventListener('click', saveUser);
     document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
+    // Auto-format TOTP input (only allow numbers)
+    document.getElementById('totpCode').addEventListener('input', function (event) {
+        const value = event.target.value.replace(/\D/g, ''); // Remove non-digits
+        event.target.value = value;
+
+        // Auto-submit when 6 digits are entered
+        if (value.length === 6) {
+            verifyTotp(event);
+        }
+    });
 
     // Close modal when clicking outside
     userModal.addEventListener('click', function (event) {

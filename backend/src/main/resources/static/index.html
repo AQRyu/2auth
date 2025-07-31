@@ -286,18 +286,34 @@
         <div id="loginError" class="error"></div>
         <form id="authForm">
             <div class="form-group">
-                <label class="form-label">Username</label>
+                <label class="form-label" for="loginUsername">Username</label>
                 <input type="text" id="loginUsername" class="form-input" required>
             </div>
             <div class="form-group">
-                <label class="form-label">Password</label>
+                <label class="form-label" for="loginPassword">Password</label>
                 <input type="password" id="loginPassword" class="form-input" required>
             </div>
-            <div class="form-group">
-                <label class="form-label">TOTP Code (if enabled)</label>
-                <input type="text" id="loginTotp" class="form-input" placeholder="6-digit code">
-            </div>
             <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+        </form>
+    </div>
+
+    <!-- TOTP Verification Form -->
+    <div id="totpForm" class="login-form" style="display: none;">
+        <h2 class="login-title">Two-Factor Authentication</h2>
+        <p style="text-align: center; margin-bottom: 20px; color: #666;">
+            Please enter the 6-digit code from your authenticator app
+        </p>
+        <div id="totpError" class="error"></div>
+        <form id="totpAuthForm">
+            <div class="form-group">
+                <label class="form-label" for="totpCode">TOTP Code</label>
+                <input type="text" id="totpCode" class="form-input" placeholder="000000" maxlength="6"
+                    pattern="[0-9]{6}" required style="text-align: center; font-size: 18px; letter-spacing: 3px;">
+            </div>
+            <div class="form-actions" style="display: flex; gap: 10px;">
+                <button type="button" id="backToLogin" class="btn btn-secondary" style="flex: 1;">Back</button>
+                <button type="submit" class="btn btn-primary" style="flex: 2;">Verify</button>
+            </div>
         </form>
     </div>
 
@@ -370,32 +386,32 @@
                 <input type="hidden" id="userId">
 
                 <div class="form-group">
-                    <label class="form-label">Username *</label>
+                    <label class="form-label" for="userUsername">Username *</label>
                     <input type="text" id="userUsername" class="form-input" required>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Email *</label>
+                    <label class="form-label" for="userEmail">Email *</label>
                     <input type="email" id="userEmail" class="form-input" required>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">First Name</label>
+                    <label class="form-label" for="userFirstName">First Name</label>
                     <input type="text" id="userFirstName" class="form-input">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Last Name</label>
+                    <label class="form-label" for="userLastName">Last Name</label>
                     <input type="text" id="userLastName" class="form-input">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Password *</label>
+                    <label class="form-label" for="userPassword">Password *</label>
                     <input type="password" id="userPassword" class="form-input" required>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Role</label>
+                    <label class="form-label" for="userRole">Role</label>
                     <select id="userRole" class="form-input">
                         <option value="USER">User</option>
                         <option value="ADMIN">Admin</option>
