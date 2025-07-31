@@ -51,6 +51,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll().requestMatchers("/error")
                         .permitAll()
 
+                        // OpenAPI/Swagger endpoints
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/v3/api-docs").permitAll()
+                        .requestMatchers("/api-docs/**", "/api-docs").permitAll()
+                        .requestMatchers("/swagger-resources/**").permitAll()
+                        .requestMatchers("/webjars/**").permitAll()
+
                         // Static resources (admin dashboard)
                         .requestMatchers("/", "/index.html", "/admin-dashboard.js", "/admin/**")
                         .permitAll()

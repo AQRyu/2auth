@@ -21,6 +21,13 @@ import com.aqryuz.auth.dto.UserCreateRequest;
 import com.aqryuz.auth.dto.UserInfo;
 import com.aqryuz.auth.dto.UserUpdateRequest;
 import com.aqryuz.auth.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,15 +38,28 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @CrossOrigin(origins = "*", maxAge = 3600)
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin", description = "Admin endpoints for user management")
+@SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
     private final UserService userService;
 
     @GetMapping("/users")
-    public ResponseEntity<Page<UserInfo>> getAllUsers(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+    @Operation(summary = "Get All Users", description = "Retrieve paginated list of all users")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Users retrieved successfully",
+                    content = @Content(mediaType = "application/json")),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - Admin role required")})
+    public ResponseEntity<Page<UserInfo>> getAllUsers(
+            @Parameter(description = "Page number (0-based)",
+                    example = "0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size",
+                    example = "10") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Sort field",
+                    example = "createdAt") @RequestParam(defaultValue = "createdAt") String sortBy,
+            @Parameter(description = "Sort direction",
+                    example = "desc") @RequestParam(defaultValue = "desc") String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending()
                 : Sort.by(sortBy).ascending();
 
