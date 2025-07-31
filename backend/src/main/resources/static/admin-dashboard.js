@@ -557,7 +557,7 @@ async function enableTotp() {
 
         // Display QR code
         const qrContainer = document.getElementById('qrCodeContainer');
-        qrContainer.innerHTML = `<img src="data:image/png;base64,${result.qrCode}" alt="TOTP QR Code" style="max-width: 200px;">`;
+        qrContainer.innerHTML = `<img src="${result.qrCode}" alt="TOTP QR Code" style="max-width: 200px;">`;
 
         // Clear any previous errors
         document.getElementById('totpSetupError').style.display = 'none';
