@@ -3,6 +3,7 @@
 ## Quick Start
 
 ### Option 1: Using Scripts (Recommended)
+
 ```bash
 # Start development environment (DB + Spring Boot)
 ./dev-start.sh
@@ -12,6 +13,7 @@
 ```
 
 ### Option 2: Manual Steps
+
 ```bash
 # 1. Start only PostgreSQL
 docker-compose -f docker-compose.dev.yml up -d
@@ -25,6 +27,7 @@ docker-compose -f docker-compose.dev.yml down
 ```
 
 ### Option 3: VS Code Tasks
+
 - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
 - Type "Tasks: Run Task"
 - Choose from:
@@ -54,7 +57,7 @@ docker-compose -f docker-compose.dev.yml down
 
 ## URLs
 
-- **Application**: http://localhost:8080
+- **Application**: <http://localhost:8080>
 - **Database**: localhost:5432
   - DB: `auth_db`
   - User: `auth_user`
@@ -63,6 +66,7 @@ docker-compose -f docker-compose.dev.yml down
 ## Production Deployment
 
 When ready for production, use the original docker-compose:
+
 ```bash
 docker-compose up -d
 ```
@@ -70,18 +74,21 @@ docker-compose up -d
 ## Troubleshooting
 
 ### Port 8080 already in use
+
 ```bash
 # Find and kill the process
 lsof -ti:8080 | xargs kill -9
 ```
 
 ### Database connection issues
+
 ```bash
 # Restart database container
 docker-compose -f docker-compose.dev.yml restart
 ```
 
 ### Clear Maven cache
+
 ```bash
 cd backend
 mvn clean compile

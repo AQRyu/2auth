@@ -19,6 +19,7 @@ services:
 volumes:
   postgres_dev_data:
 
+
 networks:
   homelab-auth-network:
     driver: bridge
