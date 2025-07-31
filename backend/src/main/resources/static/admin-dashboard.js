@@ -407,8 +407,12 @@ async function deleteUser(userId) {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            alert('Failed to delete user: ' + (error.message || 'Unknown error'));
+            if (response.status === 400) {
+                alert('Cannot delete your own account. Please ask another admin to delete your account if needed.');
+            } else {
+                const error = await response.json();
+                alert('Failed to delete user: ' + (error.message || 'Unknown error'));
+            }
             return;
         }
 

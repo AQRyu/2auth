@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -91,8 +92,18 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id, Authentication authentication) {
         log.info("Admin deleting user with ID: {}", id);
+
+        // Prevent self-deletion
+        String currentUsername = authentication.getName();
+        UserInfo userToDelete = userService.getUserById(id);
+
+        if (currentUsername.equals(userToDelete.getUsername())) {
+            log.warn("Admin {} attempted to delete themselves", currentUsername);
+            return ResponseEntity.badRequest().build();
+        }
+
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
