@@ -1,0 +1,69 @@
+{
+  "properties": [
+    {
+      "name": "app.jwt.secret",
+      "type": "java.lang.String",
+      "description": "Secret key for JWT token signing. Must be long enough for HS256 algorithm."
+    },
+    {
+      "name": "app.jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "JWT token expiration time in milliseconds."
+    },
+    {
+      "name": "app.jwt.refresh-expiration",
+      "type": "java.lang.Long",
+      "description": "JWT refresh token expiration time in milliseconds."
+    },
+    {
+      "name": "app.totp.issuer",
+      "type": "java.lang.String",
+      "description": "TOTP issuer name displayed in authenticator apps."
+    },
+    {
+      "name": "app.totp.period",
+      "type": "java.lang.Integer",
+      "description": "TOTP time period in seconds."
+    },
+    {
+      "name": "app.totp.digits",
+      "type": "java.lang.Integer",
+      "description": "Number of digits in TOTP codes."
+    },
+    {
+      "name": "app.oauth2.client-id",
+      "type": "java.lang.String",
+      "description": "OAuth2 client identifier."
+    },
+    {
+      "name": "app.oauth2.client-secret",
+      "type": "java.lang.String",
+      "description": "OAuth2 client secret."
+    },
+    {
+      "name": "app.oauth2.redirect-uri",
+      "type": "java.lang.String",
+      "description": "OAuth2 redirect URI for authorization callbacks."
+    },
+    {
+      "name": "app.oauth2.scope",
+      "type": "java.lang.String",
+      "description": "OAuth2 scopes as comma-separated values."
+    },
+    {
+      "name": "app.admin.default-username",
+      "type": "java.lang.String",
+      "description": "Default admin username created on application startup."
+    },
+    {
+      "name": "app.admin.default-password",
+      "type": "java.lang.String",
+      "description": "Default admin password created on application startup."
+    },
+    {
+      "name": "app.admin.default-email",
+      "type": "java.lang.String",
+      "description": "Default admin email created on application startup."
+    }
+  ]
+}
