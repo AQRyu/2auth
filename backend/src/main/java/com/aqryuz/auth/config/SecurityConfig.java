@@ -51,6 +51,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll().requestMatchers("/error")
                         .permitAll()
 
+                        // Static resources (admin dashboard)
+                        .requestMatchers("/", "/index.html", "/admin-dashboard.js", "/admin/**")
+                        .permitAll()
+                        .requestMatchers("/css/**", "/js/**", "/images/**", "/static/**")
+                        .permitAll()
+
                         // OAuth2 endpoints
                         .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/.well-known/**").permitAll()
