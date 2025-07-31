@@ -172,6 +172,8 @@ function logout() {
 
 // Dashboard functions
 async function loadDashboard() {
+    // Initialize tab switching - ensure Users tab is active by default
+    switchTab('users');
     await loadUsers();
     await loadStats();
 }
@@ -456,6 +458,240 @@ function hideSuccess(elementId) {
     element.style.display = 'none';
 }
 
+// Tab switching function
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.style.display = 'none';
+        tab.classList.remove('active');
+    });
+
+    // Remove active class from all nav tabs
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Show selected tab and activate button
+    const targetTab = document.getElementById(tabName + 'Tab');
+    const targetBtn = document.getElementById(tabName + 'TabBtn');
+
+    if (targetTab && targetBtn) {
+        targetTab.style.display = 'block';
+        targetTab.classList.add('active');
+        targetBtn.classList.add('active');
+
+        // Load profile data when switching to profile tab
+        if (tabName === 'profile') {
+            loadProfile();
+        }
+    }
+}
+
+// Profile management functions
+async function loadProfile() {
+    try {
+        const response = await fetch(`${API_BASE}/user/profile`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load profile');
+        }
+
+        const profile = await response.json();
+
+        // Update profile information
+        document.getElementById('profileUsername').textContent = profile.username || '-';
+        document.getElementById('profileEmail').textContent = profile.email || '-';
+        document.getElementById('profileName').textContent =
+            (profile.firstName && profile.lastName) ? `${profile.firstName} ${profile.lastName}` : '-';
+        document.getElementById('profileRole').textContent =
+            profile.roles && profile.roles.length > 0 ? profile.roles.join(', ') : '-';
+
+        // Update TOTP status
+        updateTotpStatus(profile.totpEnabled);
+
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        alert('Failed to load profile: ' + error.message);
+    }
+}
+
+function updateTotpStatus(totpEnabled) {
+    const totpDisabled = document.getElementById('totpDisabled');
+    const totpEnabled_ = document.getElementById('totpEnabled');
+    const totpSetup = document.getElementById('totpSetup');
+
+    if (totpEnabled) {
+        totpDisabled.style.display = 'none';
+        totpEnabled_.style.display = 'flex';
+        totpSetup.style.display = 'none';
+    } else {
+        totpDisabled.style.display = 'flex';
+        totpEnabled_.style.display = 'none';
+        totpSetup.style.display = 'none';
+    }
+}
+
+// TOTP management functions
+async function enableTotp() {
+    try {
+        const response = await fetch(`${API_BASE}/user/totp/enable`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to enable TOTP');
+        }
+
+        const result = await response.json();
+
+        // Show setup section
+        document.getElementById('totpDisabled').style.display = 'none';
+        document.getElementById('totpSetup').style.display = 'block';
+
+        // Display QR code
+        const qrContainer = document.getElementById('qrCodeContainer');
+        qrContainer.innerHTML = `<img src="data:image/png;base64,${result.qrCode}" alt="TOTP QR Code" style="max-width: 200px;">`;
+
+        // Clear any previous errors
+        document.getElementById('totpSetupError').style.display = 'none';
+        document.getElementById('totpConfirmCode').value = '';
+
+    } catch (error) {
+        console.error('Error enabling TOTP:', error);
+        alert('Failed to enable TOTP: ' + error.message);
+    }
+}
+
+async function confirmTotp() {
+    const totpCode = document.getElementById('totpConfirmCode').value;
+
+    if (!totpCode || totpCode.length !== 6) {
+        showError('totpSetupError', 'Please enter a valid 6-digit TOTP code');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/user/totp/confirm`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                totpCode: totpCode
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to confirm TOTP');
+        }
+
+        // TOTP enabled successfully
+        updateTotpStatus(true);
+        alert('TOTP enabled successfully!');
+
+    } catch (error) {
+        console.error('Error confirming TOTP:', error);
+        showError('totpSetupError', error.message);
+    }
+}
+
+async function disableTotp() {
+    if (!confirm('Are you sure you want to disable two-factor authentication? This will make your account less secure.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/user/totp/disable`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to disable TOTP');
+        }
+
+        updateTotpStatus(false);
+        alert('TOTP disabled successfully.');
+
+    } catch (error) {
+        console.error('Error disabling TOTP:', error);
+        alert('Failed to disable TOTP: ' + error.message);
+    }
+}
+
+function cancelTotpSetup() {
+    updateTotpStatus(false);
+    document.getElementById('qrCodeContainer').innerHTML = '';
+    document.getElementById('totpConfirmCode').value = '';
+    document.getElementById('totpSetupError').style.display = 'none';
+}
+
+// Password change function
+async function changePassword(event) {
+    event.preventDefault();
+
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    // Clear previous messages
+    hideError('passwordChangeError');
+    hideSuccess('passwordChangeSuccess');
+
+    // Validate inputs
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        showError('passwordChangeError', 'All fields are required');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showError('passwordChangeError', 'New passwords do not match');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showError('passwordChangeError', 'New password must be at least 6 characters long');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/user/password/change`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                currentPassword: currentPassword,
+                newPassword: newPassword
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to change password');
+        }
+
+        showSuccess('passwordChangeSuccess', 'Password changed successfully!');
+        document.getElementById('changePasswordForm').reset();
+
+    } catch (error) {
+        console.error('Error changing password:', error);
+        showError('passwordChangeError', error.message);
+    }
+}
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', function () {
     authFormEl.addEventListener('submit', login);
@@ -481,6 +717,30 @@ document.addEventListener('DOMContentLoaded', function () {
     userModal.addEventListener('click', function (event) {
         if (event.target === userModal) {
             closeModal();
+        }
+    });
+
+    // Tab navigation event listeners
+    document.getElementById('usersTabBtn').addEventListener('click', () => switchTab('users'));
+    document.getElementById('profileTabBtn').addEventListener('click', () => switchTab('profile'));
+
+    // TOTP management event listeners
+    document.getElementById('enableTotpBtn').addEventListener('click', enableTotp);
+    document.getElementById('confirmTotpBtn').addEventListener('click', confirmTotp);
+    document.getElementById('disableTotpBtn').addEventListener('click', disableTotp);
+    document.getElementById('cancelTotpBtn').addEventListener('click', cancelTotpSetup);
+
+    // Password change form event listener
+    document.getElementById('changePasswordForm').addEventListener('submit', changePassword);
+
+    // Auto-format TOTP confirmation input (only allow numbers)
+    document.getElementById('totpConfirmCode').addEventListener('input', function (event) {
+        const value = event.target.value.replace(/\D/g, ''); // Remove non-digits
+        event.target.value = value;
+
+        // Auto-submit when 6 digits are entered
+        if (value.length === 6) {
+            confirmTotp();
         }
     });
 });
