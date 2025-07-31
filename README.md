@@ -28,8 +28,9 @@ docker-compose up -d
 
 ### 2. Access the Service
 
-- **API Base URL**: `http://localhost:8080/auth`
-- **Health Check**: `http://localhost:8080/auth/api/health`
+- **API Base URL**: `http://localhost:8080`
+- **Authentication API**: `http://localhost:8080/api/auth/*`
+- **Health Check**: `http://localhost:8080/api/health`
 - **Default Admin**: username `admin`, password `admin123`
 
 ⚠️ **Important**: Change the default admin password immediately after first login!
@@ -72,7 +73,7 @@ ADMIN_EMAIL=admin@yourdomain.com
 #### Login
 
 ```bash
-POST /auth/api/auth/login
+POST /api/auth/login
 Content-Type: application/json
 
 {
@@ -103,7 +104,7 @@ Response:
 #### Refresh Token
 
 ```bash
-POST /auth/api/auth/refresh
+POST /api/auth/refresh
 Content-Type: application/json
 
 {
@@ -116,14 +117,14 @@ Content-Type: application/json
 #### Get All Users
 
 ```bash
-GET /auth/api/admin/users?page=0&size=10&sortBy=createdAt&sortDir=desc
+GET /api/admin/users?page=0&size=10&sortBy=createdAt&sortDir=desc
 Authorization: Bearer jwt_token_here
 ```
 
 #### Create User
 
 ```bash
-POST /auth/api/admin/users
+POST /api/admin/users
 Authorization: Bearer jwt_token_here
 Content-Type: application/json
 
@@ -140,7 +141,7 @@ Content-Type: application/json
 #### Update User
 
 ```bash
-PUT /auth/api/admin/users/1
+PUT /api/admin/users/1
 Authorization: Bearer jwt_token_here
 Content-Type: application/json
 
@@ -154,7 +155,7 @@ Content-Type: application/json
 #### Delete User
 
 ```bash
-DELETE /auth/api/admin/users/1
+DELETE /api/admin/users/1
 Authorization: Bearer jwt_token_here
 ```
 
@@ -163,14 +164,14 @@ Authorization: Bearer jwt_token_here
 #### Get Profile
 
 ```bash
-GET /auth/api/user/profile
+GET /api/user/profile
 Authorization: Bearer jwt_token_here
 ```
 
 #### Enable TOTP
 
 ```bash
-POST /auth/api/user/totp/enable
+POST /api/user/totp/enable
 Authorization: Bearer jwt_token_here
 ```
 
@@ -179,7 +180,7 @@ Response includes QR code for authenticator app setup.
 #### Confirm TOTP
 
 ```bash
-POST /auth/api/user/totp/confirm
+POST /api/user/totp/confirm
 Authorization: Bearer jwt_token_here
 Content-Type: application/json
 
@@ -191,7 +192,7 @@ Content-Type: application/json
 #### Disable TOTP
 
 ```bash
-POST /auth/api/user/totp/disable
+POST /api/user/totp/disable
 Authorization: Bearer jwt_token_here
 ```
 
@@ -202,7 +203,7 @@ Authorization: Bearer jwt_token_here
 ```javascript
 // Login
 const login = async (username, password, totpCode) => {
-  const response = await fetch('http://localhost:8080/auth/api/auth/login', {
+  const response = await fetch('http://localhost:8080/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

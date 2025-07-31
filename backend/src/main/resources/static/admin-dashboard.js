@@ -13,7 +13,7 @@ const userModal = document.getElementById('userModal');
 const userForm = document.getElementById('userForm');
 
 // Base API URL
-const API_BASE = '/auth/api';
+const API_BASE = '/api';
 
 // Authentication functions
 async function login(event) {
