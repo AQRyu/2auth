@@ -62,7 +62,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/index.html", "/admin-dashboard.js", "/admin/**")
                         .permitAll()
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/static/**")
-                        .permitAll()
+                        .permitAll().requestMatchers("/favicon.ico").permitAll()
 
                         // OAuth2 endpoints
                         .requestMatchers("/oauth2/**").permitAll()
