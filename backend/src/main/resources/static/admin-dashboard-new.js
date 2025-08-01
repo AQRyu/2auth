@@ -199,25 +199,21 @@ function displayUsers(users) {
     users.forEach(user => {
         const statusBadge = getStatusBadge(user.status);
         const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never';
-        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Not set';
         
         const row = $(`
             <tr>
-                <td>
-                    <div class="fw-bold">${escapeHtml(user.username)}</div>
-                    <div class="text-muted small d-sm-none">${escapeHtml(user.email)}</div>
-                </td>
-                <td class="d-none d-sm-table-cell">${escapeHtml(user.email)}</td>
-                <td class="d-none d-md-table-cell">${escapeHtml(fullName)}</td>
+                <td>${escapeHtml(user.username)}</td>
+                <td>${escapeHtml(user.email)}</td>
+                <td>${escapeHtml(user.firstName || '')} ${escapeHtml(user.lastName || '')}</td>
                 <td><span class="badge bg-${user.role === 'ADMIN' ? 'primary' : 'secondary'}">${user.role}</span></td>
                 <td>${statusBadge}</td>
-                <td class="d-none d-lg-table-cell">${lastLogin}</td>
+                <td class="d-none d-md-table-cell">${lastLogin}</td>
                 <td>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-primary btn-sm" onclick="editUser('${user.id}')" title="Edit User">
+                        <button class="btn btn-outline-primary btn-sm" onclick="editUser('${user.id}')">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-outline-danger btn-sm" onclick="deleteUser('${user.id}', '${escapeHtml(user.username)}')" title="Delete User">
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteUser('${user.id}', '${escapeHtml(user.username)}')">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
@@ -296,7 +292,6 @@ async function loadUserForEdit(userId) {
         }
     } catch (error) {
         showError('modalError', 'Failed to load user data');
-        console.error('Error loading user for edit:', error);
     }
 }
 
