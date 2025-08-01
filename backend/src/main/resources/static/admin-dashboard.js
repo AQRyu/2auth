@@ -238,22 +238,30 @@ function getStatusBadge(status) {
 }
 
 async function loadStats() {
-    if (!authToken) return;
-
     try {
-        const response = await fetch(`${API_BASE}/admin/stats`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
+        const response = await fetch(`${API_BASE}/admin/users?size=1000`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
         });
 
-        if (response.ok) {
-            const stats = await response.json();
-            $('#totalUsers').text(stats.totalUsers || 0);
-            $('#activeUsers').text(stats.activeUsers || 0);
-            $('#lockedUsers').text(stats.lockedUsers || 0);
-            $('#adminUsers').text(stats.adminUsers || 0);
-        }
+        if (!response.ok) return;
+
+        const result = await response.json();
+        const users = result.content || [];
+
+        const totalUsers = users.length;
+        const activeUsers = users.filter(u => !u.accountLocked && u.accountEnabled).length;
+        const lockedUsers = users.filter(u => u.accountLocked).length;
+        const adminUsers = users.filter(u => u.roles?.includes('ADMIN')).length;
+
+        document.getElementById('totalUsers').textContent = totalUsers;
+        document.getElementById('activeUsers').textContent = activeUsers;
+        document.getElementById('lockedUsers').textContent = lockedUsers;
+        document.getElementById('adminUsers').textContent = adminUsers;
+
     } catch (error) {
-        console.error('Error loading stats:', error);
+        console.error('Failed to load stats:', error);
     }
 }
 
