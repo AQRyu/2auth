@@ -182,7 +182,8 @@ async function loadUsers() {
             throw new Error('Failed to load users');
         }
 
-        const users = await response.json();
+        const result = await response.json();
+        const users = result.content || result || []; // Handle both paginated and direct array responses
         displayUsers(users);
     } catch (error) {
         showError('usersError', 'Failed to load users: ' + error.message);
@@ -197,9 +198,10 @@ function displayUsers(users) {
     tbody.empty();
 
     users.forEach(user => {
-        const statusBadge = getStatusBadge(user.status);
+        const statusBadge = getStatusBadge(user);
         const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never';
         const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Not set';
+        const userRole = getUserRole(user);
         
         const row = $(`
             <tr>
@@ -209,7 +211,7 @@ function displayUsers(users) {
                 </td>
                 <td class="d-none d-sm-table-cell">${escapeHtml(user.email)}</td>
                 <td class="d-none d-md-table-cell">${escapeHtml(fullName)}</td>
-                <td><span class="badge bg-${user.role === 'ADMIN' ? 'primary' : 'secondary'}">${user.role}</span></td>
+                <td><span class="badge bg-${userRole === 'ADMIN' ? 'primary' : 'secondary'}">${userRole}</span></td>
                 <td>${statusBadge}</td>
                 <td class="d-none d-lg-table-cell">${lastLogin}</td>
                 <td>
@@ -228,13 +230,26 @@ function displayUsers(users) {
     });
 }
 
-function getStatusBadge(status) {
-    const statusMap = {
-        'ACTIVE': '<span class="badge bg-success">Active</span>',
-        'LOCKED': '<span class="badge bg-danger">Locked</span>',
-        'DISABLED': '<span class="badge bg-warning">Disabled</span>'
-    };
-    return statusMap[status] || '<span class="badge bg-secondary">Unknown</span>';
+function getUserRole(user) {
+    // Check if user has roles array/set and includes ADMIN
+    if (user.roles && Array.isArray(user.roles)) {
+        return user.roles.includes('ADMIN') ? 'ADMIN' : 'USER';
+    } else if (user.roles?.has?.('ADMIN')) {
+        return 'ADMIN';
+    } else if (user.role) {
+        return user.role; // Fallback to single role property
+    }
+    return 'USER'; // Default fallback
+}
+
+function getStatusBadge(user) {
+    if (user.accountLocked) {
+        return '<span class="badge bg-danger">Locked</span>';
+    } else if (!user.accountEnabled) {
+        return '<span class="badge bg-warning">Disabled</span>';
+    } else {
+        return '<span class="badge bg-success">Active</span>';
+    }
 }
 
 async function loadStats() {
@@ -253,7 +268,15 @@ async function loadStats() {
         const totalUsers = users.length;
         const activeUsers = users.filter(u => !u.accountLocked && u.accountEnabled).length;
         const lockedUsers = users.filter(u => u.accountLocked).length;
-        const adminUsers = users.filter(u => u.roles?.includes('ADMIN')).length;
+        const adminUsers = users.filter(u => {
+            if (Array.isArray(u.roles)) {
+                return u.roles.includes('ADMIN');
+            } else if (u.roles && typeof u.roles === 'object') {
+                // Handle Set-like object
+                return Object.values(u.roles).includes('ADMIN') || u.roles.ADMIN;
+            }
+            return false;
+        }).length;
 
         document.getElementById('totalUsers').textContent = totalUsers;
         document.getElementById('activeUsers').textContent = activeUsers;
@@ -381,7 +404,7 @@ async function loadProfile() {
     if (!authToken) return;
 
     try {
-        const response = await fetch(`${API_BASE}/profile`, {
+        const response = await fetch(`${API_BASE}/user/profile`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
 
@@ -408,7 +431,7 @@ async function loadProfile() {
 
 async function enableTotp() {
     try {
-        const response = await fetch(`${API_BASE}/profile/totp/enable`, {
+        const response = await fetch(`${API_BASE}/user/totp/enable`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
@@ -429,7 +452,7 @@ async function confirmTotp() {
     const totpCode = $('#totpConfirmCode').val();
     
     try {
-        const response = await fetch(`${API_BASE}/profile/totp/confirm`, {
+        const response = await fetch(`${API_BASE}/user/totp/confirm`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -462,7 +485,7 @@ async function disableTotp() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/profile/totp/disable`, {
+        const response = await fetch(`${API_BASE}/user/totp/disable`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
@@ -500,8 +523,8 @@ async function changePassword(event) {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/profile/password`, {
-            method: 'PUT',
+        const response = await fetch(`${API_BASE}/user/password/change`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
