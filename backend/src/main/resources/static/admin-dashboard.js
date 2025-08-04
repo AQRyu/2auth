@@ -32,6 +32,10 @@ function initializeEventHandlers() {
     $('#cancelTotpBtn').on('click', cancelTotpSetup);
     $('#changePasswordForm').on('submit', changePassword);
 
+    // Form validation handlers
+    $('#userUsername').on('blur', validateUsername);
+    $('#userEmail').on('blur', validateEmail);
+
     // Bootstrap tab events
     $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
         const target = $(e.target).data('bs-target');
@@ -295,9 +299,11 @@ function showUserModal(userId = null) {
     
     if (userId) {
         $('#modalTitle').text('Edit User');
+        $('#saveUserBtn').text('Update User');
         loadUserForEdit(userId);
     } else {
         $('#modalTitle').text('Add New User');
+        $('#saveUserBtn').text('Save User');
     }
     
     const modal = new bootstrap.Modal('#userModal');
@@ -307,10 +313,21 @@ function showUserModal(userId = null) {
 function clearUserForm() {
     $('#userForm')[0].reset();
     $('#userId').val('');
+    
+    // Reset password field to be required for new users
+    $('#userPassword').prop('required', true);
+    $('label[for="userPassword"]').text('Password *');
+    
+    // Clear all validation states
+    $('#userForm .form-control').removeClass('is-valid is-invalid');
+    $('#userForm .invalid-feedback').remove();
 }
 
 async function loadUserForEdit(userId) {
     try {
+        // Show loading state
+        $('#saveUserBtn').text('Loading...').prop('disabled', true);
+        
         const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
@@ -322,31 +339,68 @@ async function loadUserForEdit(userId) {
             $('#userEmail').val(user.email);
             $('#userFirstName').val(user.firstName || '');
             $('#userLastName').val(user.lastName || '');
-            $('#userRole').val(user.role);
-            $('#userPassword').prop('required', false);
+            
+            // Use getUserRole helper to handle roles array/set properly
+            const userRole = getUserRole(user);
+            $('#userRole').val(userRole);
+            
+            // Clear password field and make it optional for editing
+            $('#userPassword').val('').prop('required', false);
+            
+            // Update password label to indicate it's optional
+            $('label[for="userPassword"]').text('Password (leave blank to keep current)');
+            
+            console.log('Loaded user for edit:', user.username, 'Role:', userRole);
+        } else {
+            const error = await response.json();
+            showError('modalError', error.message || 'Failed to load user data');
         }
     } catch (error) {
         showError('modalError', 'Failed to load user data');
         console.error('Error loading user for edit:', error);
+    } finally {
+        // Reset button state
+        $('#saveUserBtn').text('Update User').prop('disabled', false);
     }
 }
 
 async function saveUser() {
     const userId = $('#userId').val();
+    
+    // Clear previous errors
+    hideError('modalError');
+    
+    // Validate form
+    const isUsernameValid = validateUsername();
+    const isEmailValid = validateEmail();
+    
+    if (!isUsernameValid || !isEmailValid) {
+        showError('modalError', 'Please fix the validation errors above');
+        return;
+    }
+    
     const userData = {
-        username: $('#userUsername').val(),
-        email: $('#userEmail').val(),
-        firstName: $('#userFirstName').val(),
-        lastName: $('#userLastName').val(),
+        username: $('#userUsername').val().trim(),
+        email: $('#userEmail').val().trim(),
+        firstName: $('#userFirstName').val().trim(),
+        lastName: $('#userLastName').val().trim(),
         role: $('#userRole').val()
     };
 
     const password = $('#userPassword').val();
+    // Include password if provided or if it's a new user
     if (password || !userId) {
+        if (!password && !userId) {
+            showError('modalError', 'Password is required for new users');
+            return;
+        }
         userData.password = password;
     }
 
     try {
+        // Disable save button during request
+        $('#saveUserBtn').prop('disabled', true);
+        
         const url = userId ? `${API_BASE}/admin/users/${userId}` : `${API_BASE}/admin/users`;
         const method = userId ? 'PUT' : 'POST';
 
@@ -373,6 +427,9 @@ async function saveUser() {
     } catch (error) {
         showError('modalError', 'Network error. Please try again.');
         console.error('Error saving user:', error);
+    } finally {
+        // Re-enable save button
+        $('#saveUserBtn').prop('disabled', false);
     }
 }
 
@@ -549,6 +606,40 @@ async function changePassword(event) {
     }
 }
 
+// Form validation functions
+function validateUsername() {
+    const username = $('#userUsername').val().trim();
+    const field = $('#userUsername');
+    
+    if (username.length < 3) {
+        field.addClass('is-invalid');
+        field.next('.invalid-feedback').remove();
+        field.after('<div class="invalid-feedback">Username must be at least 3 characters long</div>');
+        return false;
+    } else {
+        field.removeClass('is-invalid').addClass('is-valid');
+        field.next('.invalid-feedback').remove();
+        return true;
+    }
+}
+
+function validateEmail() {
+    const email = $('#userEmail').val().trim();
+    const field = $('#userEmail');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(email)) {
+        field.addClass('is-invalid');
+        field.next('.invalid-feedback').remove();
+        field.after('<div class="invalid-feedback">Please enter a valid email address</div>');
+        return false;
+    } else {
+        field.removeClass('is-invalid').addClass('is-valid');
+        field.next('.invalid-feedback').remove();
+        return true;
+    }
+}
+
 // Utility functions
 function showError(elementId, message) {
     $(`#${elementId}`).text(message).removeClass('d-none');
@@ -567,6 +658,7 @@ function hideSuccess(elementId) {
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const map = {
         '&': '&amp;',
         '<': '&lt;',
