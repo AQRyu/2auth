@@ -1,18 +1,10 @@
 #!/bin/bash
 
-# Development setup script
+# Development setup script using Spring Boot Docker Compose support
 
 echo "🚀 Setting up development environment..."
 
-# Start only PostgreSQL
-echo "📦 Starting PostgreSQL container..."
-docker-compose -f docker-compose.dev.yml up -d
-
-# Wait for database to be ready
-echo "⏳ Waiting for database to be ready..."
-sleep 5
-
-# Start Spring Boot application
-echo "🌱 Starting Spring Boot application..."
+# Spring Boot will automatically start PostgreSQL via Docker Compose
+echo "🌱 Starting Spring Boot application (will auto-start PostgreSQL)..."
 cd backend
 mvn spring-boot:run

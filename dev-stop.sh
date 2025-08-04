@@ -4,12 +4,8 @@
 
 echo "🛑 Stopping development environment..."
 
-# Stop Spring Boot application (if running via script)
+# Stop Spring Boot application (Docker services will stop automatically)
 echo "🌱 Stopping Spring Boot application..."
 pkill -f "spring-boot:run" || echo "Spring Boot was not running via Maven"
 
-# Stop PostgreSQL container
-echo "📦 Stopping PostgreSQL container..."
-docker-compose -f docker-compose.dev.yml down
-
-echo "✅ Development environment stopped"
+echo "✅ Development environment stopped (Docker services stopped automatically)"
