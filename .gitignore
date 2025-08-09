@@ -9,6 +9,15 @@
 *.tar.gz
 *.rar
 
+# Frontend testing artifacts  
+frontend/node_modules/
+frontend/test-results/
+frontend/playwright-report/
+frontend/playwright/.cache/
+frontend/coverage/
+frontend/.nyc_output/
+frontend/package-lock.json
+
 # Maven
 target/
 pom.xml.tag

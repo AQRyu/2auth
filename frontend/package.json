@@ -1,0 +1,18 @@
+{
+  "name": "2auth-frontend-tests",
+  "version": "1.0.0",
+  "description": "Playwright automation testing for 2Auth frontend",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "setup": "playwright install",
+    "serve": "http-server ../backend/src/main/resources/static -p 3000 -c-1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "http-server": "^14.1.1"
+  }
+}
