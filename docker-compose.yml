@@ -18,7 +18,7 @@ services:
 
   auth-service:
     build:
-      context: ./backend
+      context: ./app
       dockerfile: Dockerfile
     container_name: homelab-auth-service
     depends_on:

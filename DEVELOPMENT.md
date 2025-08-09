@@ -19,7 +19,7 @@
 docker-compose -f docker-compose.dev.yml up -d
 
 # 2. Start Spring Boot application
-cd backend
+cd app
 mvn spring-boot:run
 
 # 3. Stop when done
@@ -45,7 +45,7 @@ docker-compose -f docker-compose.dev.yml down
 
 ## Frontend Development
 
-- Static files are served from: `backend/src/main/resources/static/`
+- Static files are served from: `app/src/main/resources/static/`
 - Changes to `index.html`, `admin-dashboard.js` are **immediately visible**
 - Just refresh the browser (F5) - no rebuilds needed!
 
@@ -90,6 +90,6 @@ docker-compose -f docker-compose.dev.yml restart
 ### Clear Maven cache
 
 ```bash
-cd backend
+cd app
 mvn clean compile
 ```

@@ -12,19 +12,19 @@ The authentication system originally allowed logged-in admin users to delete the
 
 ### Backend Changes
 
-1. **Modified AdminController.deleteUser()** (`/backend/src/main/java/com/aqryuz/auth/controller/AdminController.java`):
+1. **Modified AdminController.deleteUser()** (`/app/src/main/java/com/aqryuz/auth/controller/AdminController.java`):
    - Added `Authentication` parameter to access current user context
    - Added self-deletion prevention logic that compares current user with target user
    - Returns `400 Bad Request` if user attempts to delete themselves
    - Added proper import for `Authentication` interface
 
-2. **Frontend Enhancement** (`/backend/src/main/resources/static/admin-dashboard.js`):
+2. **Frontend Enhancement** (`/app/src/main/resources/static/admin-dashboard.js`):
    - Enhanced error handling to detect self-deletion attempts (HTTP 400)
    - Provides clear error message: "Cannot delete your own account. Please ask another admin to delete your account if needed."
 
 ### Test Coverage
 
-Created comprehensive tests (`/backend/src/test/java/com/aqryuz/auth/integration/AdminSelfDeletionTest.java`):
+Created comprehensive tests (`/app/src/test/java/com/aqryuz/auth/integration/AdminSelfDeletionTest.java`):
 
 1. **shouldPreventAdminSelfDeletion()**: Verifies that self-deletion returns 400 Bad Request
 2. **shouldAllowAdminToDeleteOtherUsers()**: Ensures admins can still delete other users normally

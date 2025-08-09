@@ -10,8 +10,8 @@ Successfully removed the `/auth` context path from the Spring Boot application w
 
 **Files:**
 
-- `/backend/src/main/resources/application.properties`
-- `/backend/src/main/resources/application-docker.properties`
+- `/app/src/main/resources/application.properties`
+- `/app/src/main/resources/application-docker.properties`
 
 **Changes:**
 
@@ -53,7 +53,7 @@ The API endpoints are now organized as follows:
 
 ### 3. Frontend JavaScript
 
-**File:** `/backend/src/main/resources/static/admin-dashboard.js`
+**File:** `/app/src/main/resources/static/admin-dashboard.js`
 
 **Changes:**
 
@@ -62,7 +62,7 @@ The API endpoints are now organized as follows:
 
 ### 4. OpenAPI Configuration
 
-**File:** `/backend/src/main/java/com/aqryuz/auth/config/OpenApiConfig.java`
+**File:** `/app/src/main/java/com/aqryuz/auth/config/OpenApiConfig.java`
 
 **Changes:**
 

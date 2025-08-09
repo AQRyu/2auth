@@ -1,6 +1,6 @@
-# 2Auth Frontend Testing with Playwright
+# 2Auth UI Testing with Playwright
 
-Simple, powerful automation testing for the 2Auth frontend using Playwright - the most popular and easy-to-learn testing framework.
+Simple, powerful automation testing for the 2Auth UI using Playwright - the most popular and easy-to-learn testing framework.
 
 ## 🎭 Why Playwright?
 
@@ -116,7 +116,7 @@ npx playwright show-trace test-results/trace.zip
 
 ## ✅ What This Tests
 
-Your frontend is validated for:
+Your UI is validated for:
 
 - 🔐 **Security** - Login, TOTP, form validation
 - 📱 **Responsiveness** - Works on all device sizes  
@@ -127,7 +127,7 @@ Your frontend is validated for:
 
 ## 🎉 Success!
 
-Your static frontend now has professional-grade automated testing with **Playwright** - the easiest and most popular testing framework!
+Your static UI now has professional-grade automated testing with **Playwright** - the easiest and most popular testing framework!
 
 **Key Benefits:**
 - ✅ Catches bugs before users do
