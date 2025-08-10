@@ -12,30 +12,37 @@ import com.aqryuz.auth.entity.User;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByUsername(String username);
+        Optional<User> findByUsername(String username);
 
-    Optional<User> findByEmail(String email);
+        Optional<User> findByEmail(String email);
 
-    boolean existsByUsername(String username);
+        boolean existsByUsername(String username);
 
-    boolean existsByEmail(String email);
+        boolean existsByEmail(String email);
 
-    @Query("SELECT u FROM User u WHERE u.username = ?1 OR u.email = ?1")
-    Optional<User> findByUsernameOrEmail(String usernameOrEmail);
+        @Query("SELECT u FROM User u WHERE u.username = ?1 OR u.email = ?1")
+        Optional<User> findByUsernameOrEmail(String usernameOrEmail);
 
-    @Modifying
-    @Query("UPDATE User u SET u.lastLogin = :lastLogin, u.failedLoginAttempts = 0, u.updatedAt = :updatedAt WHERE u.username = :username")
-    int updateLastLogin(@Param("username") String username,
-            @Param("lastLogin") LocalDateTime lastLogin,
-            @Param("updatedAt") LocalDateTime updatedAt);
+        @Modifying
+        @Query("UPDATE User u SET u.lastLogin = :lastLogin, u.failedLoginAttempts = 0, u.accountLocked = false, u.lockoutTime = null, u.updatedAt = :updatedAt WHERE u.username = :username")
+        int updateLastLogin(@Param("username") String username,
+                        @Param("lastLogin") LocalDateTime lastLogin,
+                        @Param("updatedAt") LocalDateTime updatedAt);
 
-    @Modifying
-    @Query("UPDATE User u SET u.failedLoginAttempts = :attempts, u.updatedAt = :updatedAt WHERE u.username = :username")
-    int updateFailedLoginAttempts(@Param("username") String username,
-            @Param("attempts") int attempts, @Param("updatedAt") LocalDateTime updatedAt);
+        @Modifying
+        @Query("UPDATE User u SET u.failedLoginAttempts = :attempts, u.updatedAt = :updatedAt WHERE u.username = :username")
+        int updateFailedLoginAttempts(@Param("username") String username,
+                        @Param("attempts") int attempts,
+                        @Param("updatedAt") LocalDateTime updatedAt);
 
-    @Modifying
-    @Query("UPDATE User u SET u.accountLocked = true, u.failedLoginAttempts = :attempts, u.updatedAt = :updatedAt WHERE u.username = :username")
-    int lockAccount(@Param("username") String username, @Param("attempts") int attempts,
-            @Param("updatedAt") LocalDateTime updatedAt);
+        @Modifying
+        @Query("UPDATE User u SET u.accountLocked = true, u.failedLoginAttempts = :attempts, u.lockoutTime = :lockoutTime, u.updatedAt = :updatedAt WHERE u.username = :username")
+        int lockAccount(@Param("username") String username, @Param("attempts") int attempts,
+                        @Param("lockoutTime") LocalDateTime lockoutTime,
+                        @Param("updatedAt") LocalDateTime updatedAt);
+
+        @Modifying
+        @Query("UPDATE User u SET u.accountLocked = false, u.failedLoginAttempts = 0, u.lockoutTime = null, u.updatedAt = :updatedAt WHERE u.username = :username")
+        int unlockAccount(@Param("username") String username,
+                        @Param("updatedAt") LocalDateTime updatedAt);
 }

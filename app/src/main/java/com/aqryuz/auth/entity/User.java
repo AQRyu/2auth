@@ -85,6 +85,9 @@ public class User implements UserDetails {
     @Column(name = "failed_login_attempts")
     private int failedLoginAttempts = 0;
 
+    @Column(name = "lockout_time")
+    private LocalDateTime lockoutTime;
+
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 

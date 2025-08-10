@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.aqryuz.auth.config.AppProperties;
 import com.aqryuz.auth.dto.UserCreateRequest;
 import com.aqryuz.auth.dto.UserInfo;
 import com.aqryuz.auth.dto.UserUpdateRequest;
@@ -31,6 +32,7 @@ public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TotpService totpService;
+    private final AppProperties appProperties;
 
     @Override
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
@@ -193,14 +195,65 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + username));
 
+        // Check if user is currently locked and if lockout period has expired
+        if (user.isAccountLocked() && user.getLockoutTime() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            long lockoutDurationMinutes = appProperties.security().lockoutDurationMinutes();
+
+            if (now.isAfter(user.getLockoutTime().plusMinutes(lockoutDurationMinutes))) {
+                // Lockout period has expired, unlock the account
+                LocalDateTime unlockTime = LocalDateTime.now();
+                int updated = userRepository.unlockAccount(username, unlockTime);
+                if (updated > 0) {
+                    log.info("Account automatically unlocked due to expired lockout period: {}",
+                            username);
+                }
+                return;
+            }
+        }
+
         int newAttempts = user.getFailedLoginAttempts() + 1;
+        int maxAttempts = appProperties.security().maxFailedAttempts();
         LocalDateTime now = LocalDateTime.now();
 
-        if (newAttempts >= 3) {
-            userRepository.lockAccount(username, newAttempts, now);
+        if (newAttempts >= maxAttempts) {
+            // Calculate lockout duration (progressive lockout if enabled)
+            long lockoutDuration = calculateLockoutDuration(newAttempts);
+            LocalDateTime lockoutTime = now.plusMinutes(lockoutDuration);
+
+            userRepository.lockAccount(username, newAttempts, lockoutTime, now);
+            log.warn("Account locked after {} failed attempts: {} (lockout duration: {} minutes)",
+                    newAttempts, username, lockoutDuration);
         } else {
             userRepository.updateFailedLoginAttempts(username, newAttempts, now);
+            log.warn("Failed login attempt #{} for user: {}", newAttempts, username);
         }
+    }
+
+    @Transactional
+    public void unlockAccount(String username) {
+        LocalDateTime now = LocalDateTime.now();
+        int updated = userRepository.unlockAccount(username, now);
+        if (updated > 0) {
+            log.info("Account unlocked: {}", username);
+        }
+    }
+
+    private long calculateLockoutDuration(int failedAttempts) {
+        long baseDuration = appProperties.security().lockoutDurationMinutes();
+
+        if (!appProperties.security().progressiveLockout()) {
+            return baseDuration;
+        }
+
+        // Progressive lockout: increase duration exponentially
+        int maxAttempts = appProperties.security().maxFailedAttempts();
+        int excessAttempts = failedAttempts - maxAttempts + 1;
+
+        // Base duration * 2^(excess attempts), max 24 hours
+        double multiplier = Math.pow(2.0, excessAttempts - 1.0);
+        long progressiveDuration = (long) (baseDuration * multiplier);
+        return Math.min(progressiveDuration, 24L * 60L); // Cap at 24 hours
     }
 
     public Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
