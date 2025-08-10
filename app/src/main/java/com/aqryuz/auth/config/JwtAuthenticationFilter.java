@@ -49,12 +49,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UserDetails userDetails = userService.loadUserByUsername(username);
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
+                    // Try to refresh token for sliding window activity
+                    String refreshedToken = jwtService.refreshTokenForActivity(jwt, userDetails);
+
+                    if (refreshedToken == null) {
+                        // Session expired due to max duration
+                        log.info("Session expired for user: {}", username);
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.getWriter().write(
+                                "{\"error\":\"Session expired\",\"code\":\"SESSION_EXPIRED\"}");
+                        response.setContentType("application/json");
+                        return;
+                    }
+
+                    // Set authentication
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(userDetails, null,
                                     userDetails.getAuthorities());
                     authToken
                             .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                    // If token was refreshed, add it to response header
+                    if (!refreshedToken.equals(jwt)) {
+                        response.setHeader("Authorization", "Bearer " + refreshedToken);
+                        response.setHeader("X-Token-Refreshed", "true");
+                        log.debug("Token refreshed for sliding window activity for user: {}",
+                                username);
+                    }
                 }
             }
         } catch (Exception e) {

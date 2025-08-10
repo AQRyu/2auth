@@ -1,5 +1,7 @@
 package com.aqryuz.auth.service;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +25,11 @@ public class JwtService {
     private final AppProperties appProperties;
     private final TokenBlacklistService tokenBlacklistService;
 
+    // Custom claims for session management
+    private static final String CLAIM_FIRST_ISSUED = "firstIssued";
+    private static final String CLAIM_LAST_ACTIVITY = "lastActivity";
+    private static final String CLAIM_SESSION_ID = "sessionId";
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
@@ -37,11 +44,71 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+        // Add session management claims
+        extraClaims.put(CLAIM_FIRST_ISSUED, System.currentTimeMillis());
+        extraClaims.put(CLAIM_LAST_ACTIVITY, System.currentTimeMillis());
+        extraClaims.put(CLAIM_SESSION_ID, java.util.UUID.randomUUID().toString());
+
         return buildToken(extraClaims, userDetails, appProperties.jwt().expiration());
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, appProperties.jwt().refreshExpiration());
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(CLAIM_FIRST_ISSUED, System.currentTimeMillis());
+        claims.put(CLAIM_SESSION_ID, java.util.UUID.randomUUID().toString());
+
+        return buildToken(claims, userDetails, appProperties.jwt().refreshExpiration());
+    }
+
+    /**
+     * Generate a new token with updated activity timestamp for sliding window sessions
+     */
+    public String refreshTokenForActivity(String token, UserDetails userDetails) {
+        if (!appProperties.jwt().enableSlidingWindow()) {
+            return token; // Return original token if sliding window is disabled
+        }
+
+        try {
+            Claims claims = extractAllClaims(token);
+
+            // Check if we're within sliding window threshold
+            Long lastActivity = claims.get(CLAIM_LAST_ACTIVITY, Long.class);
+            if (lastActivity != null) {
+                long minutesSinceActivity = ChronoUnit.MINUTES
+                        .between(Instant.ofEpochMilli(lastActivity), Instant.now());
+
+                // Only refresh if activity is within sliding window
+                if (minutesSinceActivity <= appProperties.jwt().slidingWindowMinutes()) {
+                    // Check max session duration
+                    Long firstIssued = claims.get(CLAIM_FIRST_ISSUED, Long.class);
+                    if (firstIssued != null) {
+                        long sessionDurationMinutes = ChronoUnit.MINUTES
+                                .between(Instant.ofEpochMilli(firstIssued), Instant.now());
+
+                        if (sessionDurationMinutes >= appProperties.jwt()
+                                .maxSessionDurationMinutes()) {
+                            log.info("Session exceeded maximum duration for user: {}",
+                                    userDetails.getUsername());
+                            return null; // Session expired due to max duration
+                        }
+                    }
+
+                    // Create new token with updated activity
+                    Map<String, Object> newClaims = new HashMap<>();
+                    newClaims.put(CLAIM_FIRST_ISSUED, claims.get(CLAIM_FIRST_ISSUED));
+                    newClaims.put(CLAIM_LAST_ACTIVITY, System.currentTimeMillis());
+                    newClaims.put(CLAIM_SESSION_ID, claims.get(CLAIM_SESSION_ID));
+
+                    log.debug("Refreshing token for sliding window activity for user: {}",
+                            userDetails.getUsername());
+                    return buildToken(newClaims, userDetails, appProperties.jwt().expiration());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error refreshing token for activity: {}", e.getMessage());
+        }
+
+        return token; // Return original token if refresh not needed or failed
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails,
@@ -60,7 +127,64 @@ public class JwtService {
         }
 
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        if (!username.equals(userDetails.getUsername())) {
+            return false;
+        }
+
+        if (isTokenExpired(token)) {
+            return false;
+        }
+
+        // Check session duration limits
+        return isSessionValid(token);
+    }
+
+    /**
+     * Check if the session is still valid based on maximum session duration
+     */
+    private boolean isSessionValid(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            Long firstIssued = claims.get(CLAIM_FIRST_ISSUED, Long.class);
+
+            if (firstIssued != null) {
+                long sessionDurationMinutes = ChronoUnit.MINUTES
+                        .between(Instant.ofEpochMilli(firstIssued), Instant.now());
+
+                if (sessionDurationMinutes >= appProperties.jwt().maxSessionDurationMinutes()) {
+                    log.debug("Session exceeded maximum duration: {} minutes",
+                            sessionDurationMinutes);
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error checking session validity: {}", e.getMessage());
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get session information from token
+     */
+    public Map<String, Object> getSessionInfo(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            Map<String, Object> sessionInfo = new HashMap<>();
+
+            sessionInfo.put("username", claims.getSubject());
+            sessionInfo.put("sessionId", claims.get(CLAIM_SESSION_ID));
+            sessionInfo.put("firstIssued", claims.get(CLAIM_FIRST_ISSUED));
+            sessionInfo.put("lastActivity", claims.get(CLAIM_LAST_ACTIVITY));
+            sessionInfo.put("issuedAt", claims.getIssuedAt());
+            sessionInfo.put("expiration", claims.getExpiration());
+
+            return sessionInfo;
+        } catch (Exception e) {
+            log.error("Error extracting session info: {}", e.getMessage());
+            return new HashMap<>();
+        }
     }
 
     private boolean isTokenExpired(String token) {
