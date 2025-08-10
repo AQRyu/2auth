@@ -3,11 +3,13 @@ package com.aqryuz.auth.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.aqryuz.auth.dto.LoginRequest;
 import com.aqryuz.auth.dto.LoginResponse;
 import com.aqryuz.auth.service.AuthenticationService;
+import com.aqryuz.auth.service.JwtService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AuthController {
 
         private final AuthenticationService authenticationService;
+        private final JwtService jwtService;
 
         @PostMapping("/login")
         @Operation(summary = "User Login",
@@ -61,14 +64,20 @@ public class AuthController {
         }
 
         @PostMapping("/logout")
-        @Operation(summary = "User Logout", description = "Logout user (client-side token removal)")
+        @Operation(summary = "User Logout", description = "Logout user and blacklist token")
         @SecurityRequirement(name = "bearerAuth")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Logout successful"),
                         @ApiResponse(responseCode = "401", description = "Unauthorized")})
-        public ResponseEntity<Void> logout() {
-                // For JWT-based authentication, logout is typically handled on the client side
-                // by removing the token. Server-side token blacklisting could be implemented here.
+        public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
+                // Extract token from Authorization header and blacklist it
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                        String token = authHeader.substring(7);
+                        jwtService.blacklistToken(token);
+                        log.info("User logged out and token blacklisted");
+                } else {
+                        log.warn("Logout attempted without valid Authorization header");
+                }
                 return ResponseEntity.ok().build();
         }
 

@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 public class JwtService {
 
     private final AppProperties appProperties;
+    private final TokenBlacklistService tokenBlacklistService;
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -52,6 +53,12 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
+        // Check if token is blacklisted first
+        if (tokenBlacklistService.isTokenBlacklisted(token)) {
+            log.debug("Token is blacklisted");
+            return false;
+        }
+
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
@@ -77,5 +84,12 @@ public class JwtService {
     private SecretKey getSignInKey() {
         byte[] keyBytes = appProperties.jwt().secret().getBytes();
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * Blacklist a token (for logout functionality)
+     */
+    public void blacklistToken(String token) {
+        tokenBlacklistService.blacklistToken(token);
     }
 }
