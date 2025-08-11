@@ -4,7 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(JwtProperties jwt, TotpProperties totp, OAuth2Properties oauth2,
-                AdminProperties admin, SecurityProperties security, CorsProperties cors) {
+                AdminProperties admin, SecurityProperties security, CorsProperties cors,
+                DeviceManagementProperties deviceManagement) {
 
         public record JwtProperties(String secret, long expiration, long refreshExpiration,
                         long slidingWindowMinutes, boolean enableSlidingWindow,
@@ -28,5 +29,9 @@ public record AppProperties(JwtProperties jwt, TotpProperties totp, OAuth2Proper
 
         public record CorsProperties(String allowedOrigins, String allowedMethods,
                         String allowedHeaders, boolean allowCredentials, long maxAge) {
+        }
+
+        public record DeviceManagementProperties(int maxSessionsPerUser, boolean trackLocation,
+                        boolean allowMultipleDevices) {
         }
 }

@@ -28,7 +28,7 @@ public class JwtService {
     // Custom claims for session management
     private static final String CLAIM_FIRST_ISSUED = "firstIssued";
     private static final String CLAIM_LAST_ACTIVITY = "lastActivity";
-    private static final String CLAIM_SESSION_ID = "sessionId";
+    public static final String CLAIM_SESSION_ID = "sessionId";
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);

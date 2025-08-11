@@ -11,6 +11,7 @@ import com.aqryuz.auth.dto.LoginRequest;
 import com.aqryuz.auth.dto.LoginResponse;
 import com.aqryuz.auth.dto.UserInfo;
 import com.aqryuz.auth.entity.User;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,8 +24,9 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
     private final JwtService jwtService;
+    private final UserSessionService userSessionService;
 
-    public LoginResponse authenticate(LoginRequest request) {
+    public LoginResponse authenticate(LoginRequest request, HttpServletRequest httpRequest) {
         try {
             // First, authenticate username/password
             Authentication authentication =
@@ -48,9 +50,16 @@ public class AuthenticationService {
                 }
             }
 
-            // Generate tokens
+            // Generate tokens with session ID
             String accessToken = jwtService.generateToken(user);
             String refreshToken = jwtService.generateRefreshToken(user);
+
+            // Extract session ID from access token
+            String sessionId = jwtService.extractClaim(accessToken,
+                    claims -> (String) claims.get(JwtService.CLAIM_SESSION_ID));
+
+            // Create user session for multi-device tracking
+            userSessionService.createSession(user, sessionId, httpRequest);
 
             // Update last login
             userService.updateLastLogin(user.getUsername());

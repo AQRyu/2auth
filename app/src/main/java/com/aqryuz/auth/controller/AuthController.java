@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,9 +42,10 @@ public class AuthController {
                                         content = @Content(mediaType = "application/json")),
                         @ApiResponse(responseCode = "400", description = "Invalid request format",
                                         content = @Content(mediaType = "application/json"))})
-        public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                        HttpServletRequest httpRequest) {
                 log.info("Login attempt for user: {}", request.getUsernameOrEmail());
-                LoginResponse response = authenticationService.authenticate(request);
+                LoginResponse response = authenticationService.authenticate(request, httpRequest);
                 return ResponseEntity.ok(response);
         }
 
