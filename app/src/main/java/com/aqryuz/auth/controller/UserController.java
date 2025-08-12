@@ -58,19 +58,7 @@ public class UserController {
         return ResponseEntity.ok("TOTP disabled successfully");
     }
 
-    @PostMapping("/password/change")
-    public ResponseEntity<String> changePassword(Authentication authentication,
-            @RequestBody ChangePasswordRequest request) {
-        String username = authentication.getName();
-        log.info("User {} changing password", username);
 
-        // Note: In a real implementation, you should verify the current password first
-        UserInfo user = userService.getUserByUsername(username);
-        userService.updateUser(user.getId(), com.aqryuz.auth.dto.UserUpdateRequest.builder()
-                .password(request.getNewPassword()).build());
-
-        return ResponseEntity.ok("Password changed successfully");
-    }
 
     // Inner classes for request/response DTOs
     public static class TotpResponse {
@@ -111,24 +99,5 @@ public class UserController {
         }
     }
 
-    public static class ChangePasswordRequest {
-        private String currentPassword;
-        private String newPassword;
 
-        public String getCurrentPassword() {
-            return currentPassword;
-        }
-
-        public void setCurrentPassword(String currentPassword) {
-            this.currentPassword = currentPassword;
-        }
-
-        public String getNewPassword() {
-            return newPassword;
-        }
-
-        public void setNewPassword(String newPassword) {
-            this.newPassword = newPassword;
-        }
-    }
 }

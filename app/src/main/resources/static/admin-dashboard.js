@@ -30,7 +30,6 @@ function initializeEventHandlers() {
     $('#disableTotpBtn').on('click', disableTotp);
     $('#confirmTotpBtn').on('click', confirmTotp);
     $('#cancelTotpBtn').on('click', cancelTotpSetup);
-    $('#changePasswordForm').on('submit', changePassword);
 
     // Form validation handlers
     $('#userUsername').on('blur', validateUsername);
@@ -562,48 +561,6 @@ function cancelTotpSetup() {
     $('#enableTotpBtn').prop('disabled', false);
     $('#totpConfirmCode').val('');
     hideError('totpSetupError');
-}
-
-async function changePassword(event) {
-    event.preventDefault();
-
-    const currentPassword = $('#currentPassword').val();
-    const newPassword = $('#newPassword').val();
-    const confirmPassword = $('#confirmPassword').val();
-
-    hideError('passwordChangeError');
-    hideSuccess('passwordChangeSuccess');
-
-    if (newPassword !== confirmPassword) {
-        showError('passwordChangeError', 'New passwords do not match');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE}/user/password/change`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-                currentPassword,
-                newPassword
-            })
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            showSuccess('passwordChangeSuccess', 'Password changed successfully');
-            $('#changePasswordForm')[0].reset();
-        } else {
-            showError('passwordChangeError', result.message || 'Failed to change password');
-        }
-    } catch (error) {
-        showError('passwordChangeError', 'Network error. Please try again.');
-        console.error('Error changing password:', error);
-    }
 }
 
 // Form validation functions
