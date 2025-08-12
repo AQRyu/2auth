@@ -1,6 +1,7 @@
 package com.aqryuz.auth.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,153 +33,162 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Transactional
 class SessionTimeoutIntegrationTest {
 
-    @Container
-    @SuppressWarnings("resource")
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
-            .withDatabaseName("auth_test_db").withUsername("testuser").withPassword("testpass");
+        @Container
+        @SuppressWarnings("resource")
+        static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+                        .withDatabaseName("auth_test_db").withUsername("testuser")
+                        .withPassword("testpass");
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("app.jwt.sliding-window-minutes", () -> "10");
-        registry.add("app.jwt.enable-sliding-window", () -> "true");
-        registry.add("app.jwt.max-session-duration-minutes", () -> "120");
-    }
+        @DynamicPropertySource
+        static void configureProperties(DynamicPropertyRegistry registry) {
+                registry.add("spring.datasource.url", postgres::getJdbcUrl);
+                registry.add("spring.datasource.username", postgres::getUsername);
+                registry.add("spring.datasource.password", postgres::getPassword);
+                registry.add("app.jwt.sliding-window-minutes", () -> "10");
+                registry.add("app.jwt.enable-sliding-window", () -> "true");
+                registry.add("app.jwt.max-session-duration-minutes", () -> "120");
+        }
 
-    @Autowired
-    private WebApplicationContext webApplicationContext;
+        @Autowired
+        private WebApplicationContext webApplicationContext;
 
-    private MockMvc mockMvc;
+        private MockMvc mockMvc;
 
-    @Autowired
-    private UserRepository userRepository;
+        @Autowired
+        private UserRepository userRepository;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private AppProperties appProperties;
+        @Autowired
+        private AppProperties appProperties;
 
-    @BeforeEach
-    void setUp() {
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
-    }
+        @Autowired
+        private PasswordEncoder passwordEncoder;
 
-    @Test
-    void shouldConfigureSessionTimeoutProperties() {
-        AppProperties.JwtProperties jwtProps = appProperties.jwt();
+        @BeforeEach
+        void setUp() {
+                this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                                .apply(springSecurity()).build();
+        }
 
-        assertThat(jwtProps.slidingWindowMinutes()).isEqualTo(10);
-        assertThat(jwtProps.enableSlidingWindow()).isTrue();
-        assertThat(jwtProps.maxSessionDurationMinutes()).isEqualTo(120);
-    }
+        @Test
+        void shouldConfigureSessionTimeoutProperties() {
+                AppProperties.JwtProperties jwtProps = appProperties.jwt();
 
-    @Test
-    void shouldProvideSessionInfoEndpoint() throws Exception {
-        // Create test user
-        User testUser = User.builder().username("sessiontestuser").email("session@test.com")
-                .password("$2a$10$Yt2A.lKbZiOx8eBbv6CQJO0vDq4gNj4iH1BjFV6F6J6ByqoHfJI1K") // testpass
-                .accountLocked(false).accountEnabled(true).build();
-        userRepository.save(testUser);
+                assertThat(jwtProps.slidingWindowMinutes()).isEqualTo(10);
+                assertThat(jwtProps.enableSlidingWindow()).isTrue();
+                assertThat(jwtProps.maxSessionDurationMinutes()).isEqualTo(120);
+        }
 
-        // Login to get token
-        String loginRequest = """
-                {
-                    "usernameOrEmail": "sessiontestuser",
-                    "password": "testpass"
-                }
-                """;
+        @Test
+        void shouldProvideSessionInfoEndpoint() throws Exception {
+                // Create test user
+                User testUser = User.builder().username("sessiontestuser").email("session@test.com")
+                                .password(passwordEncoder.encode("testpass")).accountLocked(false)
+                                .accountEnabled(true).build();
+                userRepository.save(testUser);
 
-        MvcResult loginResult = mockMvc
-                .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequest))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").exists())
-                .andReturn();
+                // Login to get token
+                String loginRequest = """
+                                {
+                                    "usernameOrEmail": "sessiontestuser",
+                                    "password": "testpass"
+                                }
+                                """;
 
-        JsonNode loginResponse =
-                objectMapper.readTree(loginResult.getResponse().getContentAsString());
-        String token = loginResponse.get("accessToken").asText();
+                MvcResult loginResult = mockMvc
+                                .perform(post("/api/auth/login")
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(loginRequest))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.accessToken").exists()).andReturn();
 
-        // Test session info endpoint
-        mockMvc.perform(get("/api/auth/session/info").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("sessiontestuser"))
-                .andExpect(jsonPath("$.issuedAt").exists())
-                .andExpect(jsonPath("$.expiresAt").exists())
-                .andExpect(jsonPath("$.firstIssued").exists())
-                .andExpect(jsonPath("$.lastActivity").exists())
-                .andExpect(jsonPath("$.sessionId").exists())
-                .andExpect(jsonPath("$.remainingMinutes").exists())
-                .andExpect(jsonPath("$.maxSessionMinutes").value(120))
-                .andExpect(jsonPath("$.slidingWindowEnabled").value(true));
-    }
+                JsonNode loginResponse = objectMapper
+                                .readTree(loginResult.getResponse().getContentAsString());
+                String token = loginResponse.get("accessToken").asText();
 
-    @Test
-    void shouldRefreshSessionEndpoint() throws Exception {
-        // Create test user
-        User testUser = User.builder().username("refreshtestuser").email("refresh@test.com")
-                .password("$2a$10$Yt2A.lKbZiOx8eBbv6CQJO0vDq4gNj4iH1BjFV6F6J6ByqoHfJI1K") // testpass
-                .accountLocked(false).accountEnabled(true).build();
-        userRepository.save(testUser);
+                // Test session info endpoint
+                mockMvc.perform(get("/api/auth/session/info").header("Authorization",
+                                "Bearer " + token)).andExpect(status().isOk())
+                                .andExpect(jsonPath("$.username").value("sessiontestuser"))
+                                .andExpect(jsonPath("$.issuedAt").exists())
+                                .andExpect(jsonPath("$.expiresAt").exists())
+                                .andExpect(jsonPath("$.firstIssued").exists())
+                                .andExpect(jsonPath("$.lastActivity").exists())
+                                .andExpect(jsonPath("$.sessionId").exists())
+                                .andExpect(jsonPath("$.remainingMinutes").exists())
+                                .andExpect(jsonPath("$.maxSessionMinutes").value(120))
+                                .andExpect(jsonPath("$.slidingWindowEnabled").value(true));
+        }
 
-        // Login to get token
-        String loginRequest = """
-                {
-                    "usernameOrEmail": "refreshtestuser",
-                    "password": "testpass"
-                }
-                """;
+        @Test
+        void shouldRefreshSessionEndpoint() throws Exception {
+                // Create test user
+                User testUser = User.builder().username("refreshtestuser").email("refresh@test.com")
+                                .password(passwordEncoder.encode("testpass")).accountLocked(false)
+                                .accountEnabled(true).build();
+                userRepository.save(testUser);
 
-        MvcResult loginResult = mockMvc
-                .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequest))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").exists())
-                .andReturn();
+                // Login to get token
+                String loginRequest = """
+                                {
+                                    "usernameOrEmail": "refreshtestuser",
+                                    "password": "testpass"
+                                }
+                                """;
 
-        JsonNode loginResponse =
-                objectMapper.readTree(loginResult.getResponse().getContentAsString());
-        String token = loginResponse.get("accessToken").asText();
+                MvcResult loginResult = mockMvc
+                                .perform(post("/api/auth/login")
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(loginRequest))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.accessToken").exists()).andReturn();
 
-        // Test session refresh endpoint
-        mockMvc.perform(
-                post("/api/auth/session/refresh").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Session refreshed successfully"));
-    }
+                JsonNode loginResponse = objectMapper
+                                .readTree(loginResult.getResponse().getContentAsString());
+                String token = loginResponse.get("accessToken").asText();
 
-    @Test
-    void shouldValidateSessionEndpoint() throws Exception {
-        // Create test user
-        User testUser = User.builder().username("validatetestuser").email("validate@test.com")
-                .password("$2a$10$Yt2A.lKbZiOx8eBbv6CQJO0vDq4gNj4iH1BjFV6F6J6ByqoHfJI1K") // testpass
-                .accountLocked(false).accountEnabled(true).build();
-        userRepository.save(testUser);
+                // Test session refresh endpoint
+                mockMvc.perform(post("/api/auth/session/refresh").header("Authorization",
+                                "Bearer " + token)).andExpect(status().isOk())
+                                .andExpect(jsonPath("$.message")
+                                                .value("Session refreshed successfully"));
+        }
 
-        // Login to get token
-        String loginRequest = """
-                {
-                    "usernameOrEmail": "validatetestuser",
-                    "password": "testpass"
-                }
-                """;
+        @Test
+        void shouldValidateSessionEndpoint() throws Exception {
+                // Create test user
+                User testUser = User.builder().username("validatetestuser")
+                                .email("validate@test.com")
+                                .password(passwordEncoder.encode("testpass")).accountLocked(false)
+                                .accountEnabled(true).build();
+                userRepository.save(testUser);
 
-        MvcResult loginResult = mockMvc
-                .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(loginRequest))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").exists())
-                .andReturn();
+                // Login to get token
+                String loginRequest = """
+                                {
+                                    "usernameOrEmail": "validatetestuser",
+                                    "password": "testpass"
+                                }
+                                """;
 
-        JsonNode loginResponse =
-                objectMapper.readTree(loginResult.getResponse().getContentAsString());
-        String token = loginResponse.get("accessToken").asText();
+                MvcResult loginResult = mockMvc
+                                .perform(post("/api/auth/login")
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(loginRequest))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.accessToken").exists()).andReturn();
 
-        // Test session validation endpoint
-        mockMvc.perform(
-                post("/api/auth/session/validate").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.valid").value(true))
-                .andExpect(jsonPath("$.username").value("validatetestuser"))
-                .andExpect(jsonPath("$.sessionInfo").exists());
-    }
+                JsonNode loginResponse = objectMapper
+                                .readTree(loginResult.getResponse().getContentAsString());
+                String token = loginResponse.get("accessToken").asText();
+
+                // Test session validation endpoint
+                mockMvc.perform(post("/api/auth/session/validate").header("Authorization",
+                                "Bearer " + token)).andExpect(status().isOk())
+                                .andExpect(jsonPath("$.valid").value(true))
+                                .andExpect(jsonPath("$.username").value("validatetestuser"))
+                                .andExpect(jsonPath("$.sessionInfo").exists());
+        }
 }
