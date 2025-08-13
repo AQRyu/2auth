@@ -1,0 +1,57 @@
+version: 2
+updates:
+  # Enable version updates for Maven
+  - package-ecosystem: "maven"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "java"
+    reviewers:
+      - "AQRyu"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/ui-tests"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "javascript"
+    reviewers:
+      - "AQRyu"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  # Enable version updates for Docker
+  - package-ecosystem: "docker"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+    reviewers:
+      - "AQRyu"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    reviewers:
+      - "AQRyu"
+    commit-message:
+      prefix: "deps"
+      include: "scope"

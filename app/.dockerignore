@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+CHANGELOG.md
+SECURITY.md
+LICENSE
+
+# Development files
+.vscode
+.idea
+*.iml
+
+# Test files
+ui-tests/
+**/test-results/
+**/playwright-report/
+
+# Build artifacts
+target/
+*.log
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Environment files
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
