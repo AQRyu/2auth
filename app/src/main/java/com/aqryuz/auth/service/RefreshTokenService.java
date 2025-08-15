@@ -63,6 +63,9 @@ public class RefreshTokenService {
 
         // Extract device information
         String userAgent = request.getHeader("User-Agent");
+        if (userAgent == null || userAgent.trim().isEmpty()) {
+            userAgent = "unknown";
+        }
         String ipAddress = getClientIpAddress(request);
         String deviceFingerprint = generateDeviceFingerprint(userAgent, ipAddress);
 

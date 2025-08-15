@@ -1,9 +1,11 @@
 package com.aqryuz.auth.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.util.Arrays;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import com.aqryuz.auth.dto.UserCreateRequest;
 import com.aqryuz.auth.entity.User;
 import com.aqryuz.auth.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -30,135 +33,172 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Transactional
 class AuthenticationIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private UserRepository userRepository;
+        @Autowired
+        private UserRepository userRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+        @Autowired
+        private PasswordEncoder passwordEncoder;
 
-    @BeforeEach
-    void setUp() {
-        userRepository.deleteAll();
+        @BeforeEach
+        void setUp() {
+                userRepository.deleteAll();
 
-        // Create a test user with unique email/username
-        User testUser = User.builder().username("integrationtestuser")
-                .password(passwordEncoder.encode("password123"))
-                .email("integrationtest@example.com").firstName("Test").lastName("User")
-                .accountEnabled(true).accountLocked(false).totpEnabled(false)
-                .roles(Set.of(User.Role.USER)).build();
+                // Create a test user with unique email/username
+                User testUser = User.builder().username("integrationtestuser")
+                                .password(passwordEncoder.encode("password123"))
+                                .email("integrationtest@example.com").firstName("Test")
+                                .lastName("User").accountEnabled(true).accountLocked(false)
+                                .totpEnabled(false).roles(Set.of(User.Role.USER)).build();
 
-        userRepository.save(testUser);
-    }
+                userRepository.save(testUser);
+        }
 
-    @Test
-    void shouldAuthenticateValidUser() throws Exception {
-        LoginRequest loginRequest = LoginRequest.builder().usernameOrEmail("integrationtestuser")
-                .password("password123").build();
+        @Test
+        void shouldAuthenticateValidUser() throws Exception {
+                LoginRequest loginRequest =
+                                LoginRequest.builder().usernameOrEmail("integrationtestuser")
+                                                .password("password123").build();
 
-        MvcResult result = mockMvc
-                .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").exists())
-                .andExpect(jsonPath("$.refreshToken").exists())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.user.username").value("integrationtestuser"))
-                .andExpect(jsonPath("$.requireTotp").value(false)).andReturn();
+                MvcResult result = mockMvc
+                                .perform(post("/api/auth/login")
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(objectMapper
+                                                                .writeValueAsString(loginRequest)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.accessToken").exists())
+                                .andExpect(jsonPath("$.refreshToken").value(nullValue())) // Refresh
+                                                                                          // token
+                                                                                          // is
+                                                                                          // stored
+                                                                                          // in
+                                                                                          // cookie,
+                                                                                          // not
+                                                                                          // response
+                                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                                .andExpect(jsonPath("$.user.username").value("integrationtestuser"))
+                                .andExpect(jsonPath("$.requireTotp").value(false)).andReturn();
 
-        String responseBody = result.getResponse().getContentAsString();
-        LoginResponse loginResponse = objectMapper.readValue(responseBody, LoginResponse.class);
+                String responseBody = result.getResponse().getContentAsString();
+                LoginResponse loginResponse =
+                                objectMapper.readValue(responseBody, LoginResponse.class);
 
-        assertThat(loginResponse.getAccessToken()).isNotBlank();
-        assertThat(loginResponse.getRefreshToken()).isNotBlank();
-        assertThat(loginResponse.getUser().getUsername()).isEqualTo("integrationtestuser");
-    }
+                assertThat(loginResponse.getAccessToken()).isNotBlank();
+                assertThat(loginResponse.getRefreshToken()).isNull(); // Refresh token is stored in
+                                                                      // HTTP-only cookie
+                assertThat(loginResponse.getUser().getUsername()).isEqualTo("integrationtestuser");
 
-    @Test
-    void shouldRejectInvalidCredentials() throws Exception {
-        LoginRequest loginRequest = LoginRequest.builder().usernameOrEmail("integrationtestuser")
-                .password("wrongpassword").build();
+                // Verify refresh token cookie was set
+                Cookie[] cookies = result.getResponse().getCookies();
+                assertThat(cookies).isNotEmpty();
+                Cookie refreshTokenCookie = Arrays.stream(cookies)
+                                .filter(cookie -> "refresh_token".equals(cookie.getName()))
+                                .findFirst().orElse(null);
+                assertThat(refreshTokenCookie).isNotNull();
+                assertThat(refreshTokenCookie.getValue()).isNotBlank();
+                assertThat(refreshTokenCookie.isHttpOnly()).isTrue();
+        }
 
-        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isUnauthorized());
-    }
+        @Test
+        void shouldRejectInvalidCredentials() throws Exception {
+                LoginRequest loginRequest =
+                                LoginRequest.builder().usernameOrEmail("integrationtestuser")
+                                                .password("wrongpassword").build();
 
-    @Test
-    void shouldRejectNonExistentUser() throws Exception {
-        LoginRequest loginRequest = LoginRequest.builder().usernameOrEmail("nonexistent")
-                .password("password123").build();
+                mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andExpect(status().isUnauthorized());
+        }
 
-        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isUnauthorized());
-    }
+        @Test
+        void shouldRejectNonExistentUser() throws Exception {
+                LoginRequest loginRequest = LoginRequest.builder().usernameOrEmail("nonexistent")
+                                .password("password123").build();
 
-    @Test
-    void shouldCreateUserAsAdmin() throws Exception {
-        // First, create an admin user with unique credentials
-        User adminUser = User.builder().username("integrationadmin")
-                .password(passwordEncoder.encode("admin123")).email("integrationadmin@example.com")
-                .firstName("Admin").lastName("User").accountEnabled(true).accountLocked(false)
-                .totpEnabled(false).roles(Set.of(User.Role.ADMIN, User.Role.USER)).build();
+                mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andExpect(status().isUnauthorized());
+        }
 
-        userRepository.save(adminUser);
+        @Test
+        void shouldCreateUserAsAdmin() throws Exception {
+                // First, create an admin user with unique credentials
+                User adminUser = User.builder().username("integrationadmin")
+                                .password(passwordEncoder.encode("admin123"))
+                                .email("integrationadmin@example.com").firstName("Admin")
+                                .lastName("User").accountEnabled(true).accountLocked(false)
+                                .totpEnabled(false).roles(Set.of(User.Role.ADMIN, User.Role.USER))
+                                .build();
 
-        // Login as admin to get token
-        LoginRequest adminLogin = LoginRequest.builder().usernameOrEmail("integrationadmin")
-                .password("admin123").build();
+                userRepository.save(adminUser);
 
-        MvcResult loginResult = mockMvc
-                .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(adminLogin)))
-                .andExpect(status().isOk()).andReturn();
+                // Login as admin to get token
+                LoginRequest adminLogin = LoginRequest.builder().usernameOrEmail("integrationadmin")
+                                .password("admin123").build();
 
-        LoginResponse loginResponse = objectMapper
-                .readValue(loginResult.getResponse().getContentAsString(), LoginResponse.class);
+                MvcResult loginResult = mockMvc
+                                .perform(post("/api/auth/login")
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(objectMapper
+                                                                .writeValueAsString(adminLogin)))
+                                .andExpect(status().isOk()).andReturn();
 
-        // Create new user as admin
-        UserCreateRequest createRequest = UserCreateRequest.builder().username("integrationnewuser")
-                .password("newpassword123").email("integrationnewuser@example.com").firstName("New")
-                .lastName("User").accountEnabled(true).roles(Set.of(User.Role.USER)).build();
+                LoginResponse loginResponse = objectMapper.readValue(
+                                loginResult.getResponse().getContentAsString(),
+                                LoginResponse.class);
 
-        mockMvc.perform(post("/api/admin/users")
-                .header("Authorization", "Bearer " + loginResponse.getAccessToken())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.username").value("integrationnewuser"))
-                .andExpect(jsonPath("$.email").value("integrationnewuser@example.com"));
+                // Create new user as admin
+                UserCreateRequest createRequest = UserCreateRequest.builder()
+                                .username("integrationnewuser").password("newpassword123")
+                                .email("integrationnewuser@example.com").firstName("New")
+                                .lastName("User").accountEnabled(true).roles(Set.of(User.Role.USER))
+                                .build();
 
-        // Verify user was created in database
-        assertThat(userRepository.findByUsername("integrationnewuser")).isPresent();
-    }
+                mockMvc.perform(post("/api/admin/users")
+                                .header("Authorization", "Bearer " + loginResponse.getAccessToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.username").value("integrationnewuser"))
+                                .andExpect(jsonPath("$.email")
+                                                .value("integrationnewuser@example.com"));
 
-    @Test
-    void shouldRejectUserCreationWithoutAdminRole() throws Exception {
-        // Login as regular user
-        LoginRequest userLogin = LoginRequest.builder().usernameOrEmail("integrationtestuser")
-                .password("password123").build();
+                // Verify user was created in database
+                assertThat(userRepository.findByUsername("integrationnewuser")).isPresent();
+        }
 
-        MvcResult loginResult = mockMvc
-                .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(userLogin)))
-                .andExpect(status().isOk()).andReturn();
+        @Test
+        void shouldRejectUserCreationWithoutAdminRole() throws Exception {
+                // Login as regular user
+                LoginRequest userLogin =
+                                LoginRequest.builder().usernameOrEmail("integrationtestuser")
+                                                .password("password123").build();
 
-        LoginResponse loginResponse = objectMapper
-                .readValue(loginResult.getResponse().getContentAsString(), LoginResponse.class);
+                MvcResult loginResult = mockMvc
+                                .perform(post("/api/auth/login")
+                                                .contentType(MediaType.APPLICATION_JSON)
+                                                .content(objectMapper
+                                                                .writeValueAsString(userLogin)))
+                                .andExpect(status().isOk()).andReturn();
 
-        // Try to create user without admin role
-        UserCreateRequest createRequest = UserCreateRequest.builder().username("unauthorized")
-                .password("password123").email("unauthorized@example.com").build();
+                LoginResponse loginResponse = objectMapper.readValue(
+                                loginResult.getResponse().getContentAsString(),
+                                LoginResponse.class);
 
-        mockMvc.perform(post("/api/admin/users")
-                .header("Authorization", "Bearer " + loginResponse.getAccessToken())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isForbidden());
-    }
+                // Try to create user without admin role
+                UserCreateRequest createRequest = UserCreateRequest.builder()
+                                .username("unauthorized").password("password123")
+                                .email("unauthorized@example.com").build();
+
+                mockMvc.perform(post("/api/admin/users")
+                                .header("Authorization", "Bearer " + loginResponse.getAccessToken())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .andExpect(status().isForbidden());
+        }
 }
