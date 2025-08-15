@@ -49,7 +49,8 @@ public class JwtService {
         extraClaims.put(CLAIM_LAST_ACTIVITY, System.currentTimeMillis());
         extraClaims.put(CLAIM_SESSION_ID, java.util.UUID.randomUUID().toString());
 
-        return buildToken(extraClaims, userDetails, appProperties.jwt().expiration());
+        // Use short expiration for access tokens (15 minutes) for security
+        return buildToken(extraClaims, userDetails, 900000L); // 15 minutes in milliseconds
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
@@ -81,6 +82,7 @@ public class JwtService {
                 if (minutesSinceActivity <= appProperties.jwt().slidingWindowMinutes()) {
                     // Check max session duration
                     Long firstIssued = claims.get(CLAIM_FIRST_ISSUED, Long.class);
+
                     if (firstIssued != null) {
                         long sessionDurationMinutes = ChronoUnit.MINUTES
                                 .between(Instant.ofEpochMilli(firstIssued), Instant.now());
@@ -101,6 +103,7 @@ public class JwtService {
 
                     log.debug("Refreshing token for sliding window activity for user: {}",
                             userDetails.getUsername());
+
                     return buildToken(newClaims, userDetails, appProperties.jwt().expiration());
                 }
             }

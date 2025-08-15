@@ -10,8 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.aqryuz.auth.dto.LoginRequest;
 import com.aqryuz.auth.dto.LoginResponse;
 import com.aqryuz.auth.dto.UserInfo;
+import com.aqryuz.auth.entity.RefreshToken;
 import com.aqryuz.auth.entity.User;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,8 +27,11 @@ public class AuthenticationService {
     private final UserService userService;
     private final JwtService jwtService;
     private final UserSessionService userSessionService;
+    private final RefreshTokenService refreshTokenService;
+    private final CookieService cookieService;
 
-    public LoginResponse authenticate(LoginRequest request, HttpServletRequest httpRequest) {
+    public LoginResponse authenticate(LoginRequest request, HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         try {
             // First, authenticate username/password
             Authentication authentication =
@@ -50,9 +55,14 @@ public class AuthenticationService {
                 }
             }
 
-            // Generate tokens with session ID
+            // Generate short-lived access token (15 minutes)
             String accessToken = jwtService.generateToken(user);
-            String refreshToken = jwtService.generateRefreshToken(user);
+
+            // Create secure refresh token stored in HTTP-only cookie
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user,
+                    request.isRememberMe(), httpRequest);
+            cookieService.createRefreshTokenCookie(httpResponse, refreshToken.getToken(),
+                    request.isRememberMe());
 
             // Extract session ID from access token
             String sessionId = jwtService.extractClaim(accessToken,
@@ -64,10 +74,16 @@ public class AuthenticationService {
             // Update last login
             userService.updateLastLogin(user.getUsername());
 
-            log.info("User authenticated successfully: {}", user.getUsername());
+            log.info("User authenticated successfully: {} (rememberMe: {})", user.getUsername(),
+                    request.isRememberMe());
 
-            return LoginResponse.builder().accessToken(accessToken).refreshToken(refreshToken)
-                    .tokenType("Bearer").expiresIn(86400) // 24 hours in seconds
+            return LoginResponse.builder().accessToken(accessToken).refreshToken(null) // Don't send
+                                                                                       // refresh
+                                                                                       // token in
+                                                                                       // response
+                                                                                       // for
+                                                                                       // security
+                    .tokenType("Bearer").expiresIn(900) // 15 minutes for access token
                     .user(UserInfo.fromUser(user)).requireTotp(false).build();
 
         } catch (AuthenticationException e) {

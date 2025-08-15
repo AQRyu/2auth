@@ -57,6 +57,7 @@ async function handleLogin(event) {
     
     const username = $('#loginUsername').val();
     const password = $('#loginPassword').val();
+    const rememberMe = $('#rememberMe').is(':checked');
 
     try {
         const response = await fetch(`${API_BASE}/auth/login`, {
@@ -65,6 +66,7 @@ async function handleLogin(event) {
             body: JSON.stringify({
                 usernameOrEmail: username,
                 password: password,
+                rememberMe: rememberMe,
                 totpCode: null
             })
         });
@@ -77,7 +79,7 @@ async function handleLogin(event) {
         }
 
         if (result.requireTotp) {
-            pendingLoginData = { username, password };
+            pendingLoginData = { username, password, rememberMe };
             $('#loginForm').addClass('d-none');
             $('#totpForm').removeClass('d-none');
             hideError('loginError');
@@ -86,6 +88,11 @@ async function handleLogin(event) {
             authToken = result.accessToken;
             currentUser = result.user;
             showDashboard();
+            
+            // Show success message if remember me was used
+            if (rememberMe) {
+                showToast('Successfully logged in! You\'ll stay logged in for 30 days.', 'success');
+            }
         }
     } catch (error) {
         showError('loginError', 'Network error. Please try again.');
@@ -111,6 +118,7 @@ async function handleTotpVerification(event) {
             body: JSON.stringify({
                 usernameOrEmail: pendingLoginData.username,
                 password: pendingLoginData.password,
+                rememberMe: pendingLoginData.rememberMe || false,
                 totpCode: totpCode
             })
         });
@@ -124,8 +132,14 @@ async function handleTotpVerification(event) {
 
         authToken = result.accessToken;
         currentUser = result.user;
+        const wasRememberMe = pendingLoginData.rememberMe;
         pendingLoginData = null;
         showDashboard();
+        
+        // Show success message if remember me was used
+        if (wasRememberMe) {
+            showToast('Successfully logged in with 2FA! You\'ll stay logged in for 30 days.', 'success');
+        }
     } catch (error) {
         showError('totpError', 'Network error. Please try again.');
         console.error('TOTP verification error:', error);
@@ -140,7 +154,25 @@ function backToLogin() {
     pendingLoginData = null;
 }
 
-function logout() {
+async function logout() {
+    try {
+        // Call the backend logout to invalidate refresh token
+        await fetch(`${API_BASE}/auth/logout`, {
+            method: 'POST',
+            headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+            credentials: 'include' // Include cookies for refresh token
+        });
+    } catch (error) {
+        console.warn('Logout API call failed, proceeding with client-side logout:', error);
+    }
+    
+    // Clear refresh interval
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+    
+    // Clear client-side state
     authToken = null;
     currentUser = null;
     pendingLoginData = null;
@@ -149,10 +181,13 @@ function logout() {
     $('#loginForm').removeClass('d-none');
     $('#totpForm').addClass('d-none');
     
-    // Clear forms
+    // Clear forms including remember me checkbox
     $('#loginUsername, #loginPassword, #totpCode').val('');
+    $('#rememberMe').prop('checked', false);
     hideError('loginError');
     hideError('totpError');
+    
+    showToast('Successfully logged out', 'success');
 }
 
 function showDashboard() {
@@ -162,11 +197,57 @@ function showDashboard() {
     
     loadUsers();
     loadStats();
+    
+    // Start automatic token refresh
+    startTokenRefresh();
+}
+
+// Automatic token refresh functionality
+let refreshInterval = null;
+
+function startTokenRefresh() {
+    // Clear any existing interval
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+    
+    // Refresh token every 14 minutes (1 minute before 15-minute expiry)
+    refreshInterval = setInterval(async () => {
+        await refreshAccessToken();
+    }, 14 * 60 * 1000);
+}
+
+async function refreshAccessToken() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include' // Include HTTP-only cookies
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            authToken = result.accessToken;
+            currentUser = result.user;
+            console.log('Access token refreshed successfully');
+        } else if (response.status === 401) {
+            // Refresh token is invalid/expired, force logout
+            console.log('Refresh token expired, logging out');
+            showToast('Your session has expired. Please log in again.', 'info');
+            await logout();
+        }
+    } catch (error) {
+        console.error('Token refresh failed:', error);
+        // Don't force logout on network errors, just log the error
+    }
 }
 
 function checkAuthentication() {
-    // In a real app, you might check localStorage or validate an existing token
-    // For now, just show the login form
+    // Try to refresh token on page load to check if user is already logged in
+    refreshAccessToken().then(() => {
+        if (authToken && currentUser) {
+            showDashboard();
+        }
+    });
 }
 
 // User Management Functions
@@ -612,6 +693,43 @@ function showSuccess(elementId, message) {
 
 function hideSuccess(elementId) {
     $(`#${elementId}`).addClass('d-none');
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element
+    const toastId = 'toast-' + Date.now();
+    const toastHtml = `
+        <div id="${toastId}" class="toast align-items-center text-white bg-${type === 'success' ? 'success' : 'primary'} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
+                    ${escapeHtml(message)}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    
+    // Add toast container if it doesn't exist
+    if (!$('#toast-container').length) {
+        $('body').append('<div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>');
+    }
+    
+    // Add toast to container
+    $('#toast-container').append(toastHtml);
+    
+    // Initialize and show toast
+    const toastElement = $(`#${toastId}`)[0];
+    const toast = new bootstrap.Toast(toastElement, {
+        autohide: true,
+        delay: 5000
+    });
+    toast.show();
+    
+    // Remove toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        $(`#${toastId}`).remove();
+    });
 }
 
 function escapeHtml(text) {

@@ -24,4 +24,7 @@ public class LoginRequest {
 
     @Schema(description = "TOTP code for two-factor authentication", example = "123456")
     private String totpCode;
+
+    @Schema(description = "Keep user logged in for extended period", example = "true")
+    private boolean rememberMe;
 }
