@@ -27,7 +27,7 @@
         <!-- Third-party library versions -->
         <jjwt.version>0.12.3</jjwt.version>
         <totp.version>1.7.1</totp.version>
-        <zxing.version>3.5.2</zxing.version>
+        <zxing.version>3.5.3</zxing.version>
         <springdoc.version>2.7.0</springdoc.version>
     </properties>
     
